@@ -1,0 +1,186 @@
+{% extends 'bazaar/base.html' %}
+
+{% block title %}Checkout | Bazaar{% endblock %}
+
+{% block content %}
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+<div class="form-container">
+
+    <div class="form-card">
+
+        <div class="form-header">
+            <h1>Review Your Order</h1>
+            <p>Review your products before confirming your purchase.</p>
+        </div>
+
+        {% if error %}
+        <div class="message error-message">
+            {{ error }}
+        </div>
+        {% endif %}
+
+
+        <div class="checkout-items">
+
+            {% for item in items %}
+
+            <div class="checkout-item">
+
+                <div>
+
+                    <h2>{{ item.product.name }}</h2>
+
+                    <p>
+                        Supplier:
+                        {{ item.product.supplier.username }}
+                    </p>
+
+                    <p>
+                        Price: ₹{{ item.product.price }}
+                    </p>
+
+                    <p>
+                        Quantity: {{ item.quantity }}
+                    </p>
+
+                </div>
+
+                <strong>
+                    ₹{{ item.item_total }}
+                </strong>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+
+        <div class="coupon-section">
+
+            <form method="POST" action="{% url 'checkout' %}">
+                {% csrf_token %}
+
+                <div class="form-group">
+
+                    <label for="coupon_code">
+                        Coupon Code
+                    </label>
+
+                    <input type="text" id="coupon_code" name="coupon_code" value="{{ coupon_code }}"
+                        placeholder="Enter coupon code">
+
+                </div>
+
+                <button type="submit" class="btn btn-secondary">
+                    Apply Coupon
+                </button>
+
+            </form>
+
+        </div>
+
+
+        <div class="checkout-total">
+
+            <div>
+                <span>Cart Total</span>
+                <strong>₹{{ cart_total }}</strong>
+            </div>
+
+            <div>
+                <span>Discount</span>
+                <strong>-₹{{ discount }}</strong>
+            </div>
+
+            <div>
+                <span>Final Total</span>
+                <strong>₹{{ final_total }}</strong>
+            </div>
+
+        </div>
+
+
+        <div class="form-actions">
+
+            <a href="{% url 'view_products' %}" class="btn btn-secondary">
+                Back to Products
+            </a>
+
+
+            <form method="POST" action="{% url 'create_razorpay_order' %}">
+                {% csrf_token %}
+
+                <button type="submit" class="btn btn-primary">
+                    Pay with Razorpay
+                </button>
+
+            </form>
+
+        </div>
+
+
+        {% if razorpay_order_id %}
+
+        <form id="payment-form" method="POST" action="{% url 'payment_success' %}">
+
+            {% csrf_token %}
+
+            <input type="hidden" name="razorpay_payment_id" id="razorpay_payment_id">
+
+            <input type="hidden" name="razorpay_order_id" id="razorpay_order_id">
+
+            <input type="hidden" name="razorpay_signature" id="razorpay_signature">
+
+        </form>
+
+
+        <script>
+
+            var options = {
+
+                "key": "{{ razorpay_key_id }}",
+
+                "amount": "{{ razorpay_amount }}",
+
+                "currency": "INR",
+
+                "name": "Bazaar",
+
+                "description": "Bazaar Order",
+
+                "order_id": "{{ razorpay_order_id }}",
+
+                "handler": function (response) {
+
+                    document.getElementById("razorpay_payment_id").value =
+                        response.razorpay_payment_id;
+
+                    document.getElementById("razorpay_order_id").value =
+                        response.razorpay_order_id;
+
+                    document.getElementById("razorpay_signature").value =
+                        response.razorpay_signature;
+
+                    document.getElementById("payment-form").submit();
+
+                }
+
+            };
+
+
+            var rzp = new Razorpay(options);
+
+            rzp.open();
+
+        </script>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endblock %}
