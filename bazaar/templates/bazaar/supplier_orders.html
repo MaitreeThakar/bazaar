@@ -1,0 +1,91 @@
+{% extends 'bazaar/base.html' %}
+
+{% block title %}Supplier Orders | Bazaar{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+
+    <div>
+        <h1>Orders</h1>
+        <p>View orders placed for your products.</p>
+    </div>
+
+</div>
+
+{% if error %}
+
+<div class="message error-message">
+    {{ error }}
+</div>
+
+{% endif %}
+
+<div class="order-grid">
+
+    {% for order in orders %}
+
+    <div class="order-card">
+
+        <div class="order-header">
+
+            <h2>Order #{{ order.id }}</h2>
+
+            <span class="order-id">
+                {{ order.customer.username }}
+            </span>
+
+        </div>
+
+        <div class="order-details">
+
+            <div class="order-detail">
+                <span>Customer</span>
+                <strong>{{ order.customer.username }}</strong>
+            </div>
+
+            {% for item in order.supplier_items %}
+
+            <div class="order-detail">
+                <span>Product</span>
+                <strong>{{ item.product.name }}</strong>
+            </div>
+
+            <div class="order-detail">
+                <span>Price</span>
+                <strong>₹{{ item.price }}</strong>
+            </div>
+
+            <div class="order-detail">
+                <span>Quantity</span>
+                <strong>{{ item.quantity }}</strong>
+            </div>
+
+            <div class="order-detail">
+                <span>Item Total</span>
+                <strong>₹{{ item.item_total }}</strong>
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+    {% empty %}
+
+    <div class="empty-state">
+
+        <h2>No orders yet</h2>
+
+        <p>
+            There are currently no orders for your products.
+        </p>
+
+    </div>
+
+    {% endfor %}
+
+</div>
+
+{% endblock %}

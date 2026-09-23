@@ -1,0 +1,124 @@
+{% extends 'bazaar/base.html' %}
+
+{% block title %}My Cart | Bazaar{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1>My Cart</h1>
+        <p>Review the products you have added to your cart.</p>
+    </div>
+</div>
+
+{% if error %}
+<div class="message error-message">
+    {{ error }}
+</div>
+{% endif %}
+
+{% if items %}
+<div class="cart-summary">
+
+    <div>
+        <span>Products</span>
+        <strong>{{ total_items }}</strong>
+    </div>
+
+    <div>
+        <span>Total Quantity</span>
+        <strong>{{ total_quantity }}</strong>
+    </div>
+
+</div>
+{% endif %}
+
+<div class="cart-grid">
+
+    {% for item in items %}
+
+    <div class="cart-card">
+
+        <div class="cart-header">
+            <h2>{{ item.product.name }}</h2>
+        </div>
+
+        <div class="cart-details">
+
+            <div class="cart-detail">
+                <span>Supplier</span>
+                <strong>{{ item.product.supplier.username }}</strong>
+            </div>
+
+            <div class="cart-detail">
+                <span>Price</span>
+                <strong>₹{{ item.product.price }}</strong>
+            </div>
+
+            <div class="cart-detail">
+                <span>Quantity</span>
+                <strong>{{ item.quantity }}</strong>
+            </div>
+
+            <div class="cart-detail">
+                <span>Total</span>
+                <strong>₹{{ item.item_total }}</strong>
+            </div>
+
+        </div>
+
+        <div class="cart-actions">
+
+            <form method="POST" action="{% url 'update_cart_item' item.id %}" class="cart-update-form">
+                {% csrf_token %}
+
+                <input type="number" name="quantity" value="{{ item.quantity }}" min="1" required>
+
+                <button type="submit" class="btn btn-secondary">
+                    Update
+                </button>
+            </form>
+
+            <form method="POST" action="{% url 'remove_cart_item' item.id %}" class="delete-form">
+                {% csrf_token %}
+
+                <button type="submit" class="btn btn-danger"
+                    onclick="return confirm('Are you sure you want to remove this item?');">
+                    Remove
+                </button>
+            </form>
+
+        </div>
+
+    </div>
+
+    {% empty %}
+
+    <div class="empty-state">
+        <h2>Your cart is empty</h2>
+        <p>You haven't added any products to your cart yet.</p>
+
+        <a href="{% url 'view_products' %}" class="btn btn-primary">
+            Browse Products
+        </a>
+    </div>
+
+    {% endfor %}
+
+</div>
+
+{% if items %}
+
+<div class="cart-total">
+    <span>Cart Total</span>
+    <strong>₹{{ cart_total }}</strong>
+</div>
+
+<div class="cart-checkout">
+    <a href="{% url 'checkout' %}" class="btn btn-primary">
+        Checkout
+    </a>
+</div>
+{% endif %}
+
+{% endblock %}
