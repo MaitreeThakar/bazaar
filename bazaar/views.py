@@ -8,10 +8,14 @@ from decimal import Decimal,InvalidOperation
 import random,time
 import razorpay
 from django.conf import settings
+from .tasks import send_welcome_email
+
 
 client = razorpay.Client(
     auth=(settings.RAZORPAY_KEY_ID,settings.RAZORPAY_KEY_SECRET)
 )
+
+
 
 # Create your views here.
 
@@ -60,6 +64,7 @@ def user_signup(request):
             phone=phone,
             role=role
         )
+        send_welcome_email.delay(user.email,user.username)
         return redirect("login")
     return render(request,'bazaar/signup.html')
 

@@ -129,3 +129,5 @@ MAILERS = {
 
 RAZORPAY_KEY_ID= "rzp_test_TefAKVuvuLGguR"
 RAZORPAY_KEY_SECRET= "YtX3zt7Uv4DKh91eFjZu30r0" 
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
