@@ -16,7 +16,9 @@ class Account (models.Model):
     def __str__(self):
         return self.user.username
 
-
+class RegistrationLog(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    registered_at = models.DateTimeField(auto_now_add=True)
 
 class Product(models.Model):
     name = models.CharField(max_length=100)
