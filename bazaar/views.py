@@ -1,14 +1,16 @@
-from django.shortcuts import render,redirect,get_object_or_404
-from .models import Account,Product,Order,OrderItem,Cart,CartItem,Coupon
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate,login,logout
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.shortcuts import render,redirect,get_object_or_404
+
 from decimal import Decimal,InvalidOperation
 import random,time
 import razorpay
-from django.conf import settings
+
 from .tasks import send_welcome_email
+from .models import Account,Product,Order,OrderItem,Cart,CartItem,Coupon
 
 
 client = razorpay.Client(
