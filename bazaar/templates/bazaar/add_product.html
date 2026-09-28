@@ -13,33 +13,52 @@
             <p>Add a new product to your Bazaar store.</p>
         </div>
 
-        {% if error %}
-        <div class="message error-message">
-            {{ error }}
-        </div>
-        {% endif %}
-
         <form method="POST">
 
             {% csrf_token %}
 
             <div class="form-group">
-                <label for="name">Product Name</label>
+                <label for="{{ form.name.id_for_label }}">
+                    Product Name
+                </label>
 
-                <input type="text" id="name" name="name" value="{{ name|default:'' }}" placeholder="Enter product name"
-                    required>
+                {{ form.name }}
+
+                {% for error in form.name.errors %}
+                <div class="message error-message">
+                    {{ error }}
+                </div>
+                {% endfor %}
             </div>
 
             <div class="form-group">
-                <label for="description">Description</label>
+                <label for="{{ form.description.id_for_label }}">
+                    Description
+                </label>
 
-                <textarea id="description" name="description" placeholder="Describe your product" maxlength="300"
-                    required>{{ description|default:'' }}</textarea>
+                {{ form.description }}
+
+                {% for error in form.description.errors %}
+                <div class="message error-message">
+                    {{ error }}
+                </div>
+                {% endfor %}
             </div>
-            <div class="form-group"> <label for="price">Price</label>
-                <input type="number" id="price" name="price" value="{{ price|default:'' }}"
-                    placeholder="Enter product price" min="0.01" step="0.01" required>
+
+            <div class="form-group">
+                <label for="{{ form.price.id_for_label }}">
+                    Price
+                </label>
+
+                {{ form.price }}
+
+                {% for error in form.price.errors %}
+                <div class="message error-message">
+                    {{ error }}
+                </div>
+                {% endfor %}
             </div>
+
             <div class="form-actions">
 
                 <a href="{% url 'view_products' %}" class="btn btn-secondary">
@@ -55,7 +74,6 @@
         </form>
 
     </div>
-
 
 </div>
 

@@ -522,7 +522,8 @@
             color: #333;
         }
 
-        .form-group input {
+        .form-group input,
+        .form-group select {
             width: 100%;
 
             padding: 12px 13px;
@@ -537,7 +538,8 @@
             transition: 0.2s;
         }
 
-        .form-group input:focus {
+        .form-group input:focus,
+        .form-group select :focus {
             border-color: #2563eb;
             box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
@@ -848,13 +850,16 @@
                 Hi, {{ user.username }}
             </span>
 
-            <a href="{% url 'logout' %}" class="nav-button">
-                Logout
-            </a>
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="nav-button">
+                    Logout
+                </button>
+            </form>
 
             {% else %}
 
-            <a href="{% url 'login' %}" class="nav-button">
+            <a href="{% url 'login' %}">
                 Login
             </a>
 

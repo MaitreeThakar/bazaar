@@ -13,6 +13,13 @@ from .tasks import send_welcome_email
 from .models import Account,Product,Order,OrderItem,Cart,CartItem,Coupon
 
 
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.views import LoginView,LogoutView
+from django.views.generic import ListView,CreateView,UpdateView,DeleteView,FormView
+from django.urls import reverse_lazy
+from .forms import ProductForm,CartItemForm,SignUpForm
+
+
 client = razorpay.Client(
     auth=(settings.RAZORPAY_KEY_ID,settings.RAZORPAY_KEY_SECRET)
 )
@@ -20,6 +27,34 @@ client = razorpay.Client(
 
 
 # Create your views here.
+
+class UserLoginView(LoginView):
+    template_name = 'bazaar/login.html'
+
+class UserLogoutView(LogoutView):
+    next_page = 'login'
+
+
+class UserSignupView(FormView):
+    template_name = 'bazaar/signup.html'
+    form_class = SignUpForm
+    success_url = reverse_lazy('login')
+
+    def form_valid(self, form):
+        data = form.cleaned_data
+
+        user = User.objects.create_user(
+            username=data['username'],
+            email=data['email'],
+            password=data['password'])
+
+        Account.objects.create(
+            user =user,
+            phone=data['phone'],
+            role=data['role'])
+        send_welcome_email.delay(user.email,user.username)
+        return super().form_valid(form)
+
 
 def user_signup(request):
 
@@ -70,25 +105,25 @@ def user_signup(request):
         return redirect("login")
     return render(request,'bazaar/signup.html')
 
-def user_login(request):
-    if request.method == 'POST':
-        username = request.POST['username'].strip()
-        password = request.POST['password']
+# def user_login(request):
+#     if request.method == 'POST':
+#         username = request.POST['username'].strip()
+#         password = request.POST['password']
 
-        user = authenticate(
-            request,
-            username=username,
-            password=password
-        )
-        if user is not None:
-            login(request,user)
-            return redirect("view_products")
-        return render(request,'bazaar/login.html',{'error':"Invalid username or password."})
-    return render(request,'bazaar/login.html')
+#         user = authenticate(
+#             request,
+#             username=username,
+#             password=password
+#         )
+#         if user is not None:
+#             login(request,user)
+#             return redirect("view_products")
+#         return render(request,'bazaar/login.html',{'error':"Invalid username or password."})
+#     return render(request,'bazaar/login.html')
 
-def user_logout(request):
-    logout(request)
-    return redirect("login")
+# def user_logout(request):
+#     logout(request)
+#     return redirect("login")
 
 #PASSWORD
 
@@ -203,203 +238,332 @@ def reset_password(request):
         
 #PRODUCT
 
-@login_required
-def view_products(request):
+# @login_required
+# def view_products(request):
 
-    if request.user.account.role == 'supplier':
-        products = Product.objects.filter(
-            is_deleted=False,
-            supplier=request.user
-        )
-    else:
-        products = Product.objects.filter(
+#     if request.user.account.role == 'supplier':
+#         products = Product.objects.filter(
+#             is_deleted=False,
+#             supplier=request.user
+#         )
+#     else:
+#         products = Product.objects.filter(
+#             is_deleted=False
+#         ).exclude(
+#             supplier=request.user
+#         )
+
+#     return render(
+#         request,
+#         'bazaar/products.html',
+#         {'products': products}
+#     )
+
+# @login_required
+# def add_product(request):
+
+#     if request.user.account.role != 'supplier':
+#         return render(
+#             request,
+#             'bazaar/add_product.html',
+#             {'error': 'Only suppliers can add products.'}
+#         )
+
+#     if request.method == "POST":
+#         name = request.POST['name'].strip()
+#         description = request.POST['description'].strip()
+#         price = request.POST['price'].strip()
+#         if not name or not description or not price:
+#             return render(
+#                 request,
+#                 'bazaar/add_product.html',
+#                 {
+#                     'error': "All fields are required.",
+#                     'name': name,
+#                     'description': description,
+#                     'price':price
+#                 }
+#             )
+#         try:
+#             price = Decimal(price)
+
+#         except InvalidOperation:
+
+#             return render(
+#                 request,
+#                 'bazaar/add_product.html',
+#                 {
+#                     'error': "price must be a valid number.",
+#                     'name': name,
+#                     'description': description,
+#                     'price':price
+#                 }
+#             )
+
+#         if price <= 0:
+
+#             return render(
+#                 request,
+#                 'bazaar/add_product.html',
+#                 {
+#                     'error': "price must be greater than 0.",
+#                     'name': name,
+#                     'description': description,
+#                     'price':price
+#                 }
+#             )
+#         Product.objects.create(
+#             name = name,
+#             description = description,
+#             price=price,
+#             supplier = request.user
+#         )
+#         return redirect("view_products")
+#     return render(request,'bazaar/add_product.html')
+
+# @login_required
+# def update_product(request,product_id):
+#     if request.user.account.role != 'supplier':
+#         return render(
+#             request,
+#             'bazaar/update_product.html',
+#             {'error': 'Only suppliers can update products.'}
+#         )
+
+#     product = get_object_or_404(Product,id=product_id)
+#     if product.supplier != request.user:
+#         return render(request,'bazaar/update_product.html',
+#                       {'error':"You can not update this product.",
+#                        'product':product})
+
+#     if request.method == 'POST':
+#         name = request.POST['name'].strip()
+#         description = request.POST['description'].strip()
+#         price = request.POST['price'].strip()
+#         if not name or not description or not price:
+#             return render(request,'bazaar/update_product.html',
+#                 {   'error': "All fields are required.",
+#                     'product': product
+#                 }
+#             )
+#         try:
+#             price = Decimal(price)
+
+#         except InvalidOperation:
+
+#             return render(
+#                 request,
+#                 'bazaar/update_product.html',
+#                 {
+#                     'error': "price must be a valid number.",
+#                     'product': product
+#                 }
+#             )
+
+#         if price <= 0:
+
+#             return render(
+#                 request,
+#                 'bazaar/update_product.html',
+#                 {
+#                     'error': "price must be greater than 0.",
+#                     'product': product
+#                 }
+#             )
+
+#         product.name = name
+#         product.description = description
+#         product.price = price
+#         product.save()
+#         return redirect("view_products")
+           
+#     return render(request,'bazaar/update_product.html',{'product':product})
+    
+# @login_required
+# def delete_product(request,product_id):
+
+#     if request.user.account.role != 'supplier':
+#         return render(
+#             request,
+#             'bazaar/products.html',
+#             {
+#                 'error': 'Only suppliers can delete products.',
+#                 'products': Product.objects.filter(is_deleted=False)
+#             }
+#         )
+#     product = get_object_or_404(Product,id=product_id,is_deleted=False)
+#     if product.supplier != request.user:
+#         products = Product.objects.filter(is_deleted=False)
+#         return render(request,'bazaar/products.html',
+#                         {'error':"You can not delete this product.",
+#                         'products':products})
+#     if request.method == 'POST':
+
+#         product.is_deleted = True
+#         product.save()
+#         return redirect("view_products")
+#     return redirect("view_products")
+
+
+class SupplierRequiredMixin:
+    def dispatch(self,request, *args, **kwargs):
+        if request.user.account.role != 'supplier':
+            return redirect("view_products")
+        return super().dispatch(request, *args, **kwargs)
+
+
+class CustomerRequiredMixin:
+    def dispatch(self,request,*args, **kwargs):
+        if request.user.account.role != 'customer':
+            return redirect("view_products")
+        return super().dispatch(request,*args, **kwargs)
+    
+class ProductListView(LoginRequiredMixin,ListView):
+    model = Product
+    template_name = 'bazaar/products.html'
+    context_object_name = 'products'
+    
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.account.role == 'supplier':
+            return Product.objects.filter(
+                        is_deleted=False,
+                        supplier=user
+                    )
+        return Product.objects.filter(
             is_deleted=False
         ).exclude(
-            supplier=request.user
+            supplier=user
         )
 
-    return render(
-        request,
-        'bazaar/products.html',
-        {'products': products}
-    )
+class ProductCreateView(LoginRequiredMixin,SupplierRequiredMixin,CreateView):
+    model = Product
+    form_class = ProductForm
+    template_name = 'bazaar/add_product.html'
+    success_url = reverse_lazy("view_products")
 
-@login_required
-def add_product(request):
+    def form_valid(self, form):
+        form.instance.supplier = self.request.user
+        return super().form_valid(form)
 
-    if request.user.account.role != 'supplier':
-        return render(
-            request,
-            'bazaar/add_product.html',
-            {'error': 'Only suppliers can add products.'}
-        )
+class ProductUpdateView(LoginRequiredMixin,SupplierRequiredMixin,UpdateView):
+    model = Product
+    form_class = ProductForm
+    template_name = 'bazaar/update_product.html'
+    success_url = reverse_lazy("view_products")
+    pk_url_kwarg = 'product_id'
 
-    if request.method == "POST":
-        name = request.POST['name'].strip()
-        description = request.POST['description'].strip()
-        price = request.POST['price'].strip()
-        if not name or not description or not price:
-            return render(
-                request,
-                'bazaar/add_product.html',
-                {
-                    'error': "All fields are required.",
-                    'name': name,
-                    'description': description,
-                    'price':price
-                }
-            )
-        try:
-            price = Decimal(price)
+    def get_queryset(self):
+        return Product.objects.filter(
+            is_deleted = False,
+            supplier = self.request.user
+        )  
 
-        except InvalidOperation:
+class ProductDeleteView(LoginRequiredMixin,SupplierRequiredMixin,DeleteView):
+    model=Product
+    template_name = 'bazaar/products.html'
+    success_url = reverse_lazy('view_products')
+    pk_url_kwarg = 'product_id'
 
-            return render(
-                request,
-                'bazaar/add_product.html',
-                {
-                    'error': "price must be a valid number.",
-                    'name': name,
-                    'description': description,
-                    'price':price
-                }
-            )
+    def get_queryset(self):
+        return Product.objects.filter(
+            is_deleted = False,
+            supplier = self.request.user
+        ) 
 
-        if price <= 0:
+    def delete(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        self.object.is_deleted = True
+        self.object.save(update_fields=['is_deleted'])
+        return redirect(self.get_success_url())
 
-            return render(
-                request,
-                'bazaar/add_product.html',
-                {
-                    'error': "price must be greater than 0.",
-                    'name': name,
-                    'description': description,
-                    'price':price
-                }
-            )
-        Product.objects.create(
-            name = name,
-            description = description,
-            price=price,
-            supplier = request.user
-        )
-        return redirect("view_products")
-    return render(request,'bazaar/add_product.html')
-
-@login_required
-def update_product(request,product_id):
-    if request.user.account.role != 'supplier':
-        return render(
-            request,
-            'bazaar/update_product.html',
-            {'error': 'Only suppliers can update products.'}
-        )
-
-    product = get_object_or_404(Product,id=product_id)
-    if product.supplier != request.user:
-        return render(request,'bazaar/update_product.html',
-                      {'error':"You can not update this product.",
-                       'product':product})
-
-    if request.method == 'POST':
-        name = request.POST['name'].strip()
-        description = request.POST['description'].strip()
-        price = request.POST['price'].strip()
-        if not name or not description or not price:
-            return render(request,'bazaar/update_product.html',
-                {   'error': "All fields are required.",
-                    'product': product
-                }
-            )
-        try:
-            price = Decimal(price)
-
-        except InvalidOperation:
-
-            return render(
-                request,
-                'bazaar/update_product.html',
-                {
-                    'error': "price must be a valid number.",
-                    'product': product
-                }
-            )
-
-        if price <= 0:
-
-            return render(
-                request,
-                'bazaar/update_product.html',
-                {
-                    'error': "price must be greater than 0.",
-                    'product': product
-                }
-            )
-
-        product.name = name
-        product.description = description
-        product.price = price
-        product.save()
-        return redirect("view_products")
-           
-    return render(request,'bazaar/update_product.html',{'product':product})
     
-@login_required
-def delete_product(request,product_id):
 
-    if request.user.account.role != 'supplier':
-        return render(
-            request,
-            'bazaar/products.html',
-            {
-                'error': 'Only suppliers can delete products.',
-                'products': Product.objects.filter(is_deleted=False)
-            }
-        )
-    product = get_object_or_404(Product,id=product_id,is_deleted=False)
-    if product.supplier != request.user:
-        products = Product.objects.filter(is_deleted=False)
-        return render(request,'bazaar/products.html',
-                        {'error':"You can not delete this product.",
-                        'products':products})
-    if request.method == 'POST':
-
-        product.is_deleted = True
-        product.save()
-        return redirect("view_products")
-    return redirect("view_products")
 
 #CART
-@login_required
-def view_cart(request):
-    if request.user.account.role != 'customer':
-        return render(
-            request,
-            'bazaar/view_cart.html',
-            {'error': 'Only customers can access the cart.'}
-        )
-    cart,created = Cart.objects.get_or_create(customer=request.user)
-    items = CartItem.objects.filter(cart=cart)
 
-    total_items = items.count()
-    total_quantity = sum(item.quantity for item in items)
+class CartListView(LoginRequiredMixin,CustomerRequiredMixin,ListView):
+    model = CartItem
+    template_name = 'bazaar/view_cart.html'
+    context_object_name = 'items'
 
-    cart_total=0
-    for item in items:
-        item.item_total = item.product.price * item.quantity
+    def get_queryset(self):
+        cart,created = Cart.objects.get_or_create(customer=self.request.user)
+        return CartItem.objects.filter(cart=cart)
 
-        cart_total += item.item_total
+    def get_context_data(self, **kwargs):
+        context =  super().get_context_data(**kwargs)
 
-    return render(
-        request,
-        'bazaar/view_cart.html',
-        {
-            'items': items,
-            'total_items': total_items,
-            'total_quantity': total_quantity,
-            'cart_total':cart_total
-        }
-    )
+        total_items = context['items'].count()
+        total_quantity = sum(item.quantity for item in context['items'])
+
+        cart_total=0
+        for item in context['items']:
+            item.item_total = item.product.price * item.quantity
+
+            cart_total += item.item_total
+        context['total_items'] = total_items
+        context['total_quantity'] = total_quantity
+        context['cart_total'] = cart_total
+        return context
+
+
+class CartUpdateView(LoginRequiredMixin,CustomerRequiredMixin,UpdateView):
+    model = CartItem
+    template_name = 'bazaar/view_cart.html'
+    form_class = CartItemForm
+    pk_url_kwarg = 'item_id'
+    success_url = reverse_lazy('view_cart')
+    def get_queryset(self):
+        cart, _ = Cart.objects.get_or_create(
+        customer=self.request.user)
+        return CartItem.objects.filter(cart=cart)
+
+
+class CartItemDeleteView(LoginRequiredMixin,CustomerRequiredMixin,DeleteView):
+
+    model = CartItem
+    template_name = 'bazaar/view_cart.html'
+    pk_url_kwarg = 'item_id'
+    success_url = reverse_lazy('view_cart')
+
+    def get_queryset(self):
+        cart, _ = Cart.objects.get_or_create(customer=self.request.user)
+        
+        return CartItem.objects.filter(cart=cart)
+    
+
+# @login_required
+# def view_cart(request):
+#     if request.user.account.role != 'customer':
+#         return render(
+#             request,
+#             'bazaar/view_cart.html',
+#             {'error': 'Only customers can access the cart.'}
+#         )
+#     cart,created = Cart.objects.get_or_create(customer=request.user)
+#     items = CartItem.objects.filter(cart=cart)
+
+#     total_items = items.count()
+#     total_quantity = sum(item.quantity for item in items)
+
+#     cart_total=0
+#     for item in items:
+#         item.item_total = item.product.price * item.quantity
+
+#         cart_total += item.item_total
+
+#     return render(
+#         request,
+#         'bazaar/view_cart.html',
+#         {
+#             'items': items,
+#             'total_items': total_items,
+#             'total_quantity': total_quantity,
+#             'cart_total':cart_total
+#         }
+#     )
 
 @login_required
 def product_action(request, product_id):
@@ -492,83 +656,86 @@ def product_action(request, product_id):
 
     return redirect("view_products")
 
-@login_required
-def update_cart_item(request, item_id):
-    if request.user.account.role != 'customer':
-        return redirect("view_products")
+
+   
+
+# @login_required
+# def update_cart_item(request, item_id):
+#     if request.user.account.role != 'customer':
+#         return redirect("view_products")
     
-    cart, created = Cart.objects.get_or_create(
-        customer=request.user
-    )
+#     cart, created = Cart.objects.get_or_create(
+#         customer=request.user
+#     )
 
-    item = get_object_or_404(
-        CartItem,
-        id=item_id,
-        cart=cart
-    )
+#     item = get_object_or_404(
+#         CartItem,
+#         id=item_id,
+#         cart=cart
+#     )
 
-    if request.method == "POST":
+#     if request.method == "POST":
 
-        quantity = request.POST['quantity'].strip()
+#         quantity = request.POST['quantity'].strip()
 
-        if not quantity:
-            return render(
-                request,
-                'bazaar/view_cart.html',
-                {
-                    'error': "Quantity is required.",
-                    'items': CartItem.objects.filter(cart=cart)
-                }
-            )
+#         if not quantity:
+#             return render(
+#                 request,
+#                 'bazaar/view_cart.html',
+#                 {
+#                     'error': "Quantity is required.",
+#                     'items': CartItem.objects.filter(cart=cart)
+#                 }
+#             )
 
-        try:
-            quantity = int(quantity)
+#         try:
+#             quantity = int(quantity)
 
-        except ValueError:
-            return render(
-                request,
-                'bazaar/view_cart.html',
-                {
-                    'error': "Quantity must be a valid number.",
-                    'items': CartItem.objects.filter(cart=cart)
-                }
-            )
+#         except ValueError:
+#             return render(
+#                 request,
+#                 'bazaar/view_cart.html',
+#                 {
+#                     'error': "Quantity must be a valid number.",
+#                     'items': CartItem.objects.filter(cart=cart)
+#                 }
+#             )
 
-        if quantity <= 0:
-            return render(
-                request,
-                'bazaar/view_cart.html',
-                {
-                    'error': "Quantity must be greater than 0.",
-                    'items': CartItem.objects.filter(cart=cart)
-                }
-            )
+#         if quantity <= 0:
+#             return render(
+#                 request,
+#                 'bazaar/view_cart.html',
+#                 {
+#                     'error': "Quantity must be greater than 0.",
+#                     'items': CartItem.objects.filter(cart=cart)
+#                 }
+#             )
 
-        item.quantity = quantity
-        item.save()
+#         item.quantity = quantity
+#         item.save()
 
-        return redirect("view_cart")
+#         return redirect("view_cart")
 
-    return redirect("view_cart")
+#     return redirect("view_cart")
 
-@login_required
-def remove_cart_item(request, item_id):
-    if request.user.account.role != 'customer':
-        return redirect("view_products")
-    cart, created = Cart.objects.get_or_create(
-        customer=request.user
-    )
+# @login_required
+# def remove_cart_item(request, item_id):
+#     if request.user.account.role != 'customer':
+#         return redirect("view_products")
+#     cart, created = Cart.objects.get_or_create(
+#         customer=request.user
+#     )
 
-    item = get_object_or_404(
-        CartItem,
-        id=item_id,
-        cart=cart
-    )
+#     item = get_object_or_404(
+#         CartItem,
+#         id=item_id,
+#         cart=cart
+#     )
 
-    if request.method == "POST":
-        item.delete()
+#     if request.method == "POST":
+#         item.delete()
 
-    return redirect("view_cart")
+#     return redirect("view_cart")
 
 #CHECKOUT
 
@@ -878,64 +1045,116 @@ def payment_success(request):
 
 
 #ORDER
-@login_required
-def view_orders(request):
-    if request.user.account.role != 'customer':
-        return redirect("view_products")
-    orders = Order.objects.filter(is_deleted=False,customer= request.user).prefetch_related('items')
-
-    for order in orders:
-        for item in order.items.all():
-            item.item_total = item.price * item.quantity
-
-    return render(request,'bazaar/orders.html',{'orders':orders})
 
 
-@login_required
-def supplier_orders(request):
+# @login_required
+# def view_orders(request):
+#     if request.user.account.role != 'customer':
+#         return redirect("view_products")
+#     orders = Order.objects.filter(is_deleted=False,customer= request.user).prefetch_related('items')
 
-    if request.user.account.role != 'supplier':
-        return redirect("view_products")
+#     for order in orders:
+#         for item in order.items.all():
+#             item.item_total = item.price * item.quantity
 
-    orders = Order.objects.filter(
+#     return render(request,'bazaar/orders.html',{'orders':orders})
+
+# @login_required
+# def supplier_orders(request):
+
+#     if request.user.account.role != 'supplier':
+#         return redirect("view_products")
+
+#     orders = Order.objects.filter(
+#         is_deleted=False,
+#         items__product__supplier=request.user
+#     ).prefetch_related('items__product').distinct()
+
+#     for order in orders:
+#         order.supplier_items = []
+
+#         for item in order.items.all():
+#             if item.product.supplier == request.user:
+#                 item.item_total = item.price * item.quantity
+#                 order.supplier_items.append(item)
+
+#     return render(
+#         request,
+#         'bazaar/supplier_orders.html',
+#         {'orders': orders}
+#     )
+
+# @login_required
+# def delete_order(request,order_id):
+#     if request.user.account.role != 'customer':
+#         return redirect("view_products")
+#     order = get_object_or_404(Order,id=order_id)
+
+#     if order.customer != request.user:
+
+#         orders = Order.objects.filter(is_deleted=False,customer=request.user)
+#         return render(request,'bazaar/orders.html',
+#                         {'error':"You can not delete this order.",
+#                         'orders':orders})
+    
+#     if request.method == 'POST':
+#         order.is_deleted = True
+#         order.save()
+#         return redirect("view_orders")
+#     return redirect("view_orders")
+
+class OrderListView(LoginRequiredMixin,CustomerRequiredMixin,ListView):
+    model= Order
+    template_name = 'bazaar/orders.html'
+    context_object_name = 'orders'
+
+    def get_queryset(self):
+        return Order.objects.filter(is_deleted=False,customer= self.request.user).prefetch_related('items')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        for order in context['orders']:
+            for item in order.items.all():
+                item.item_total = item.price * item.quantity
+        return context
+
+class OrderDeleteView(LoginRequiredMixin,CustomerRequiredMixin,DeleteView):
+    model = Order
+    template_name = 'bazaar/orders.html'
+    success_url = reverse_lazy("view_orders")
+    pk_url_kwarg = 'order_id'
+
+    def get_queryset(self):
+        return Order.objects.filter(
+            is_deleted=False,
+            customer=self.request.user)
+    def delete(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        self.object.is_deleted = True
+        self.object.save(update_fields=['is_deleted'])
+        return redirect(self.get_success_url())
+
+class OrderSupplierView(LoginRequiredMixin,SupplierRequiredMixin,ListView):
+    model = Order
+    template_name = 'bazaar/supplier_orders.html'
+    context_object_name = 'orders'
+
+    def get_queryset(self):
+        return Order.objects.filter(
         is_deleted=False,
-        items__product__supplier=request.user
+        items__product__supplier=self.request.user
     ).prefetch_related('items__product').distinct()
 
-    for order in orders:
-        order.supplier_items = []
-
-        for item in order.items.all():
-            if item.product.supplier == request.user:
-                item.item_total = item.price * item.quantity
-                order.supplier_items.append(item)
-
-    return render(
-        request,
-        'bazaar/supplier_orders.html',
-        {'orders': orders}
-    )
-
-@login_required
-def delete_order(request,order_id):
-    if request.user.account.role != 'customer':
-        return redirect("view_products")
-    order = get_object_or_404(Order,id=order_id)
-
-    if order.customer != request.user:
-
-        orders = Order.objects.filter(is_deleted=False,customer=request.user)
-        return render(request,'bazaar/orders.html',
-                        {'error':"You can not delete this order.",
-                        'orders':orders})
+    def get_context_data(self, **kwargs):
+        context =  super().get_context_data(**kwargs)
+        for order in context['orders']:
+            order.supplier_items = []
     
-    if request.method == 'POST':
-        order.is_deleted = True
-        order.save()
-        return redirect("view_orders")
-    return redirect("view_orders")
-
-
+            for item in order.items.all():
+                if item.product.supplier == self.request.user:
+                    item.item_total = item.price * item.quantity
+                    order.supplier_items.append(item)
+        return context
 
 
 

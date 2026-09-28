@@ -13,57 +13,97 @@
             <p>Join Bazaar and start shopping</p>
         </div>
 
-        {% if error %}
+        {% if form.non_field_errors %}
         <div class="message error-message">
-            {{ error }}
+            {{ form.non_field_errors }}
         </div>
         {% endif %}
 
         <form method="POST">
-
             {% csrf_token %}
 
             <div class="form-group">
-                <label for="username">Username</label>
+                <label for="{{ form.username.id_for_label }}">
+                    Username
+                </label>
 
-                <input type="text" id="username" name="username" value="{{ username|default:'' }}"
-                    placeholder="Choose a username" required>
+                {{ form.username }}
+
+                {% for error in form.username.errors %}
+                <div class="message error-message">
+                    {{ error }}
+                </div>
+                {% endfor %}
             </div>
 
             <div class="form-group">
-                <label for="email">Email</label>
+                <label for="{{ form.email.id_for_label }}">
+                    Email
+                </label>
 
-                <input type="email" id="email" name="email" value="{{ email|default:'' }}"
-                    placeholder="Enter your email" required>
+                {{ form.email }}
+
+                {% for error in form.email.errors %}
+                <div class="message error-message">
+                    {{ error }}
+                </div>
+                {% endfor %}
             </div>
 
             <div class="form-group">
-                <label for="phone">Phone</label>
+                <label for="{{ form.phone.id_for_label }}">
+                    Phone
+                </label>
 
-                <input type="text" id="phone" name="phone" value="{{ phone|default:'' }}"
-                    placeholder="Enter your phone number" required>
+                {{ form.phone }}
+
+                {% for error in form.phone.errors %}
+                <div class="message error-message">
+                    {{ error }}
+                </div>
+                {% endfor %}
             </div>
 
             <div class="form-group">
-                <label for="phone">Role</label>
-                <select name="role" required>
-                    <option value="">Select Role</option>
-                    <option value="customer">Customer</option>
-                    <option value="supplier">Supplier</option>
-                </select>
+                <label for="{{ form.role.id_for_label }}">
+                    Role
+                </label>
+
+                {{ form.role }}
+
+                {% for error in form.role.errors %}
+                <div class="message error-message">
+                    {{ error }}
+                </div>
+                {% endfor %}
             </div>
 
             <div class="form-group">
-                <label for="password">Password</label>
+                <label for="{{ form.password.id_for_label }}">
+                    Password
+                </label>
 
-                <input type="password" id="password" name="password" placeholder="Create a password" required>
+                {{ form.password }}
+
+                {% for error in form.password.errors %}
+                <div class="message error-message">
+                    {{ error }}
+                </div>
+                {% endfor %}
             </div>
 
             <div class="form-group">
-                <label for="confirm_password">Confirm Password</label>
+                <label for="{{ form.confirm_password.id_for_label }}">
+                    Confirm Password
+                </label>
 
-                <input type="password" id="confirm_password" name="confirm_password"
-                    placeholder="Enter your password again" required>
+                {{ form.confirm_password }}
+
+                {% for error in form.confirm_password.errors %}
+                <div class="message error-message">
+                    {{ error }}
+                </div>
+                {% endfor %}
             </div>
 
             <button type="submit" class="auth-button">
