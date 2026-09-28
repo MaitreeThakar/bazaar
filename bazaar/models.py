@@ -10,7 +10,7 @@ class Account (models.Model):
         ('customer', 'Customer'),
     )
     user = models.OneToOneField(User,on_delete=models.CASCADE,related_name="account")
-    phone = models.CharField(max_length=15)
+    phone = models.CharField(max_length=10)
     role = models.CharField(max_length=10,choices=ROLE_CHOICES)
 
     def __str__(self):
