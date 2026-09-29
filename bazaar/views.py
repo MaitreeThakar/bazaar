@@ -9,17 +9,16 @@ from django.contrib.auth.views import LoginView,LogoutView
 from django.db import transaction
 from django.shortcuts import render,redirect,get_object_or_404
 
+from django.urls import reverse_lazy
+from django.views.generic import ListView,CreateView,UpdateView,DeleteView,FormView
+
+
 from decimal import Decimal
 import random,time
 import razorpay
 
 from .tasks import send_welcome_email
 from .models import Account,Product,Order,OrderItem,Cart,CartItem,Coupon
-
-
-
-from django.views.generic import ListView,CreateView,UpdateView,DeleteView,FormView
-from django.urls import reverse_lazy
 from .forms import ProductForm,CartItemForm,SignUpForm
 
 
