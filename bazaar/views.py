@@ -1,11 +1,15 @@
 from django.conf import settings
+
 from django.contrib.auth.models import User
-from django.contrib.auth import authenticate,login,logout
+
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.views import LoginView,LogoutView
+
 from django.db import transaction
 from django.shortcuts import render,redirect,get_object_or_404
 
-from decimal import Decimal,InvalidOperation
+from decimal import Decimal
 import random,time
 import razorpay
 
@@ -13,8 +17,7 @@ from .tasks import send_welcome_email
 from .models import Account,Product,Order,OrderItem,Cart,CartItem,Coupon
 
 
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib.auth.views import LoginView,LogoutView
+
 from django.views.generic import ListView,CreateView,UpdateView,DeleteView,FormView
 from django.urls import reverse_lazy
 from .forms import ProductForm,CartItemForm,SignUpForm
@@ -56,54 +59,54 @@ class UserSignupView(FormView):
         return super().form_valid(form)
 
 
-def user_signup(request):
+# def user_signup(request):
 
-    if request.method == 'POST':
-        username = request.POST['username'].strip()
-        email = request.POST['email'].strip()
-        password = request.POST['password']
-        confirm_password = request.POST['confirm_password']
-        phone = request.POST['phone'].strip()
-        role=request.POST['role'].strip()
+#     if request.method == 'POST':
+#         username = request.POST['username'].strip()
+#         email = request.POST['email'].strip()
+#         password = request.POST['password']
+#         confirm_password = request.POST['confirm_password']
+#         phone = request.POST['phone'].strip()
+#         role=request.POST['role'].strip()
 
-        if not username or not email or not password or not confirm_password or not phone or not role:
-            return render(request,'bazaar/signup.html',
-                {  'error': "All fields are required.",
-                    'username': username,
-                    'email': email,
-                    'phone': phone,
-                    'role':role
-                }
-            )
-        if User.objects.filter(username=username).exists():
-            return render(request,'bazaar/signup.html',
-                {  'error': "Username already exists.",
-                    'username': username,
-                    'email': email,
-                    'phone': phone,
-                    'role':role
-                }
-            )
-        if password != confirm_password:
-            return render(request,'bazaar/signup.html',
-                            {'error':"Passwords do not match.",
-                            'username':username,
-                            'email':email,
-                            'phone':phone,
-                            'role':role})
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=password
-        )
-        Account.objects.create(
-            user = user,
-            phone=phone,
-            role=role
-        )
-        send_welcome_email.delay(user.email,user.username)
-        return redirect("login")
-    return render(request,'bazaar/signup.html')
+#         if not username or not email or not password or not confirm_password or not phone or not role:
+#             return render(request,'bazaar/signup.html',
+#                 {  'error': "All fields are required.",
+#                     'username': username,
+#                     'email': email,
+#                     'phone': phone,
+#                     'role':role
+#                 }
+#             )
+#         if User.objects.filter(username=username).exists():
+#             return render(request,'bazaar/signup.html',
+#                 {  'error': "Username already exists.",
+#                     'username': username,
+#                     'email': email,
+#                     'phone': phone,
+#                     'role':role
+#                 }
+#             )
+#         if password != confirm_password:
+#             return render(request,'bazaar/signup.html',
+#                             {'error':"Passwords do not match.",
+#                             'username':username,
+#                             'email':email,
+#                             'phone':phone,
+#                             'role':role})
+#         user = User.objects.create_user(
+#             username=username,
+#             email=email,
+#             password=password
+#         )
+#         Account.objects.create(
+#             user = user,
+#             phone=phone,
+#             role=role
+#         )
+#         send_welcome_email.delay(user.email,user.username)
+#         return redirect("login")
+#     return render(request,'bazaar/signup.html')
 
 # def user_login(request):
 #     if request.method == 'POST':
