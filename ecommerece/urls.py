@@ -21,5 +21,7 @@ from bazaar import views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('bazaar/',include('bazaar.urls')),
-    path('',include('bazaar.urls'))
+    path('',include('bazaar.urls')),
+    path('api/',include('api.urls')),
+     path("api-auth/", include("rest_framework.urls")),
 ]

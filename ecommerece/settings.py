@@ -37,7 +37,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'bazaar'
+    'bazaar',
+    'api',
+    'rest_framework'
 ]
 
 MIDDLEWARE = [
@@ -133,3 +135,17 @@ RAZORPAY_KEY_SECRET= "YtX3zt7Uv4DKh91eFjZu30r0"
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 
 LOGIN_REDIRECT_URL = 'view_products'
+
+REST_FRAMEWORK = {
+    # Use Django's standard `django.contrib.auth` permissions,
+    # or allow read-only access for unauthenticated users.
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly"
+    ],
+   'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 3,
+}
