@@ -134,7 +134,7 @@ RAZORPAY_KEY_SECRET= "YtX3zt7Uv4DKh91eFjZu30r0"
 
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 
-LOGIN_REDIRECT_URL = 'view_products'
+LOGIN_REDIRECT_URL = 'view_products' #because added CBV so redirected through settings
 
 REST_FRAMEWORK = {
     # Use Django's standard `django.contrib.auth` permissions,

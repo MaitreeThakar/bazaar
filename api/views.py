@@ -7,35 +7,16 @@ from rest_framework import permissions
 from django.contrib.auth.models import User
 
 from rest_framework import mixins,generics
-
+from rest_framework import viewsets
 from .serializers import ProductSerializer,SupplierSerializer
 from .permissions import IsSupplierOrReadOnly
 from bazaar.models import Product
 # Create your views here.
 
-@api_view(['GET'])
-@permission_classes([permissions.AllowAny])
-def api_root(request):
-    return Response(
-        {
-            "suppliers": reverse("users",request=request),
-            "products":reverse("products",request=request)
-        }
-    )
-
-
-# @api_view(['GET'])
-# @permission_classes([permissions.AllowAny])
-# def product_list(request):
-#     products = Product.objects.filter(is_deleted=False,supplier = request.user)
-#     serializer = ProductSerializer(products,many=True,context={'request': request})
-   
-#     return Response(serializer.data)
 
 
 
-
-class ProductList(generics.ListCreateAPIView):
+class ProductViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsSupplierOrReadOnly]
 
     queryset = Product.objects.all()
@@ -45,29 +26,7 @@ class ProductList(generics.ListCreateAPIView):
         serializer.save(supplier=self.request.user)
 
 
-        
-class ProductDetail(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsSupplierOrReadOnly]
 
-    queryset = Product.objects.all()
-    serializer_class = ProductSerializer
-
-    
-class UserList(generics.ListAPIView):
-
+class SupplierViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = User.objects.all()
-    serializer_class = SupplierSerializer
-
-
-class UserDetail(generics.RetrieveAPIView):
-
-    queryset = User.objects.all()
-    serializer_class = SupplierSerializer
-
-
-    # def get(self,request):
-
-    #     products = Product.objects.filter(is_deleted=False,supplier = request.user)
-    #     serializer = ProductSerializer(products,many=True)
-    
-    #     return Response(serializer.data)    
+    serializer_class = SupplierSerializer   

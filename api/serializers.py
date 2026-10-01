@@ -9,6 +9,9 @@ class ProductSerializer(serializers.HyperlinkedModelSerializer):
         fields = ['url','name','price','description','supplier']
 
 class SupplierSerializer(serializers.HyperlinkedModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="suppliers-detail"
+    )
     products = serializers.HyperlinkedRelatedField(many=True,view_name = "product-detail",read_only = True)
     class Meta:
         model = User
