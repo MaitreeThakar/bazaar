@@ -419,6 +419,7 @@ class CustomerRequiredMixin:
         if request.user.account.role != 'customer':
             return redirect("view_products")
         return super().dispatch(request,*args, **kwargs)
+
     
 class ProductListView(LoginRequiredMixin,ListView):
     model = Product

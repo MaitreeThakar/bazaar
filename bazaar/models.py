@@ -40,6 +40,7 @@ class CartItem(models.Model):
     product = models.ForeignKey(Product,on_delete=models.CASCADE)
     quantity = models.IntegerField()
 
+
 class Coupon(models.Model):
     code  = models.CharField(max_length=30,unique=True)
     discount_percent = models.DecimalField(max_digits=5,decimal_places=2)
