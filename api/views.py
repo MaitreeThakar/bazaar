@@ -11,10 +11,11 @@ from rest_framework import mixins,generics
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from rest_framework import viewsets
-from .serializers import ProductSerializer,SupplierSerializer,CartItemSerializer,CartSerializer
+from .serializers import ProductSerializer,SupplierSerializer,CartItemSerializer,CartSerializer,OrderSerializer,OrderItemSerializer
 from .permissions import IsSupplierOrReadOnly
-from bazaar.models import Product,Account,CartItem,Cart
+from bazaar.models import Product,Account,CartItem,Cart,Order,OrderItem
 from bazaar.tasks import send_welcome_email
+
 
 
 class UserSignup(APIView):
@@ -118,9 +119,12 @@ class UserLogout(APIView):
 class ProductViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsSupplierOrReadOnly]
 
-    queryset = Product.objects.all()
+   
     serializer_class = ProductSerializer
 
+    def get_queryset(self):
+        return Product.objects.filter(is_deleted=False)
+    
     def perform_create(self, serializer):
         serializer.save(supplier=self.request.user)
 
@@ -150,3 +154,17 @@ class CartItemViewSet(viewsets.ModelViewSet):
             customer = self.request.user
         )
         serializer.save(cart=cart)
+
+
+class OrderViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = OrderSerializer
+    def get_queryset(self):
+        return Order.objects.filter(is_deleted=False,customer= self.request.user).prefetch_related('items')
+
+
+class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = OrderItemSerializer
+    def get_queryset(self):
+            return OrderItem.objects.filter(order__customer= self.request.user)
