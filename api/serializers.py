@@ -50,15 +50,18 @@ class CartSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class OrderItemSerializer(serializers.HyperlinkedModelSerializer):
-
+    item_total = serializers.SerializerMethodField()
     class Meta:
         model = OrderItem
-        fields = [ 'product','quantity','price']  
+        fields = [ 'product','quantity','price','item_total']
+
+    def get_item_total(self,obj):
+        return obj.quantity * obj.price  
 
 class OrderSerializer(serializers.ModelSerializer):
     customer = serializers.ReadOnlyField(source= 'customer.username')
     coupon = serializers.ReadOnlyField(source= 'coupon.code')
-    items = OrderItemSerializer(many=True,read_only=True)
+    items = serializers.SerializerMethodField()
 
 
     class Meta:
@@ -69,4 +72,19 @@ class OrderSerializer(serializers.ModelSerializer):
                   'total', 'discount', 
                   'final_total', 
                   'payment_status']
+        
+    def get_items(self,obj):
+        request = self.context['request']
+        user = request.user
+
+        items = obj.items.all()
+
+        if user.account.role == 'supplier':
+            items=[
+                item for item in items
+                if item.product.supplier == user
+            ]
+        return OrderItemSerializer(
+            items,many=True, context = self.context
+        ).data
 

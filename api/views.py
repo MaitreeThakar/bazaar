@@ -1,20 +1,20 @@
-from django.shortcuts import render
-from rest_framework.reverse import reverse
 from rest_framework.response import Response
 from rest_framework.decorators import api_view,permission_classes
 from rest_framework.views import APIView
 from rest_framework import status
 from rest_framework import permissions
+from rest_framework import viewsets,mixins
+
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate,login,logout
-from rest_framework import mixins,generics
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
-from rest_framework import viewsets
-from .serializers import ProductSerializer,SupplierSerializer,CartItemSerializer,CartSerializer,OrderSerializer,OrderItemSerializer
-from .permissions import IsSupplierOrReadOnly
+
+
 from bazaar.models import Product,Account,CartItem,Cart,Order,OrderItem
 from bazaar.tasks import send_welcome_email
+
+from .serializers import *
+from .permissions import IsSupplierOrReadOnly,IsCustomerOrReadOnly
+
 
 
 
@@ -117,22 +117,35 @@ class UserLogout(APIView):
 
 
 class ProductViewSet(viewsets.ModelViewSet):
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsSupplierOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated,IsSupplierOrReadOnly]
 
    
     serializer_class = ProductSerializer
 
     def get_queryset(self):
-        return Product.objects.filter(is_deleted=False)
+        user = self.request.user
+        if user.account.role == 'supplier':
+            return Product.objects.filter(
+                        is_deleted=False,
+                        supplier=user
+                    )
+        return Product.objects.filter(
+            is_deleted=False).exclude(supplier=user)
     
     def perform_create(self, serializer):
         serializer.save(supplier=self.request.user)
+
+    def perform_destroy(self, instance):
+        instance.is_deleted = True
+        instance.save(update_fields=['is_deleted']) #so it just update this instead of writing all fields
 
 
 
 class SupplierViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = User.objects.all()
     serializer_class = SupplierSerializer   
+
+
 
 class CartViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
@@ -156,15 +169,30 @@ class CartItemViewSet(viewsets.ModelViewSet):
         serializer.save(cart=cart)
 
 
-class OrderViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = [permissions.IsAuthenticated]
+class OrderViewSet(mixins.ListModelMixin,
+                   mixins.RetrieveModelMixin,
+                   mixins.DestroyModelMixin,
+                   viewsets.GenericViewSet):
+    permission_classes = [permissions.IsAuthenticated,IsCustomerOrReadOnly]
     serializer_class = OrderSerializer
-    def get_queryset(self):
-        return Order.objects.filter(is_deleted=False,customer= self.request.user).prefetch_related('items')
 
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.account.role == 'customer':
+            
+            return Order.objects.filter(is_deleted=False,customer= self.request.user).prefetch_related('items')
+        
+        return Order.objects.filter(is_deleted=False,items__product__supplier=self.request.user).prefetch_related('items__product').distinct()
+
+    def perform_destroy(self, instance):
+        instance.is_deleted = True
+        instance.save(update_fields=['is_deleted']) #so it just update this instead of writing all fields
 
 class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = OrderItemSerializer
     def get_queryset(self):
             return OrderItem.objects.filter(order__customer= self.request.user)
+
+
