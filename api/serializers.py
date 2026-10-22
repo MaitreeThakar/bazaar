@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from bazaar.models import Product,CartItem,Cart,OrderItem,Order,Account
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
 
 # Serializer used for validating and creating a new user and account.
 class SignUpSerializer(serializers.Serializer):
@@ -51,6 +52,35 @@ class SignUpSerializer(serializers.Serializer):
             
         )
         return user
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class VerifyOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField(min_length=4,max_length=4)
+
+
+class ResendOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    new_password = serializers.CharField(
+        write_only=True,
+        validators=[validate_password]
+    )
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError(
+                {'confirm_password': 'Passwords do not match.'}
+            )
+
+        return data
+
 
 # Serializer for displaying and creating products.
 class ProductSerializer(serializers.HyperlinkedModelSerializer):

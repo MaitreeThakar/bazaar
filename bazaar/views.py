@@ -166,7 +166,7 @@ def verify_otp(request):
         if stored_otp is None:
             return render(request,'bazaar/verify_otp.html',{'error':'Session has expired. Please request a new OTP'})
 
-        if time.time() > otp_expiry:
+        if time.time() >= otp_expiry:
             return render(
                 request,
                 'bazaar/verify_otp.html',

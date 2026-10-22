@@ -15,6 +15,12 @@ urlpatterns=[
     path('login/',views.UserLogin.as_view()),
     path('logout/',views.UserLogout.as_view()),
     path('signup/',views.UserSignup.as_view()),
+
+    path('forgot_password/',views.forgot_password),
+    path('verify_otp/',views.verify_otp),
+    path('resend_otp/',views.resend_otp),
+    path('reset_password/',views.reset_password),
+
     path("",include(router.urls)),
 
 ]
