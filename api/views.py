@@ -2,7 +2,7 @@ import random,time
 
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view,permission_classes
+from rest_framework.decorators import api_view,permission_classes,action
 from rest_framework import status
 from rest_framework import permissions
 from rest_framework import viewsets,mixins
@@ -10,9 +10,15 @@ from rest_framework import viewsets,mixins
 from django.contrib.auth import authenticate,login,logout
 from django.contrib.auth.models import User
 
+from django.conf import settings
+
+import logging
+import razorpay
+from decimal import Decimal,ROUND_HALF_UP
+from django.db import transaction
 
 
-from bazaar.models import Product,CartItem,Cart,Order
+from bazaar.models import Product,CartItem,Cart,Order,Coupon,OrderItem
 from bazaar.tasks import send_welcome_email
 
 from .permissions import IsSupplierOrReadOnly,IsCustomerOrReadOnly
@@ -27,6 +33,21 @@ from .serializers import (SignUpSerializer,
                           CartItemSerializer,
                           OrderSerializer)
 
+
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+
+@login_required
+def payment_test_page(request):
+    return render(request, 'api/payment_test.html')
+
+
+
+
+
+client = razorpay.Client(
+    auth=(settings.RAZORPAY_KEY_ID,settings.RAZORPAY_KEY_SECRET)
+)
 
 
 
@@ -83,10 +104,11 @@ class UserLogout(APIView):
             status=status.HTTP_200_OK
         )
 
+# used function based view for otp and password reset flow
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def forgot_password(request):
-    serializer = ForgotPasswordSerializer(data=request.data)
+    serializer = ForgotPasswordSerializer(data=request.data) #sending data to serializer
     serializer.is_valid(raise_exception=True)
 
     email = serializer.validated_data['email']
@@ -102,18 +124,18 @@ def forgot_password(request):
     if user is None:
         return Response(response_data, status=status.HTTP_200_OK)
 
-    otp = str(random.randint(1000,9999))
+    otp = str(random.randint(1000,9999)) #generate otp of 4 digits
 
     print("OTP:", otp)
 
     request.session['reset_email'] = user.email
     request.session['reset_otp'] = otp
-    request.session['otp_expiry'] = time.time() + 300
-    request.session['otp_verified'] = False
+    request.session['otp_expiry'] = time.time() + 300  # otp valid for 5 minutes
+    request.session['otp_verified'] = False            # flag set to false
 
-    request.session.pop('password_reset_expiry', None)
+    request.session.pop('password_reset_expiry', None) 
 
-    request.session.set_expiry(600)
+    request.session.set_expiry(600)  # session valid for 10 minutes
 
 
 
@@ -135,7 +157,7 @@ def verify_otp(request):
 
     if not session_email or not session_otp or not otp_expiry:
         return Response(
-            {'error': 'Please request a new OTP.'},
+            {'error': 'Please request a new OTP.'}, # if email,otp not available then request a new otp
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -157,9 +179,10 @@ def verify_otp(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    request.session['otp_verified'] = True
-    request.session['password_reset_expiry'] = time.time() + 600
-    request.session.set_expiry(600)
+    request.session['otp_verified'] = True # flag set to true
+    request.session['password_reset_expiry'] = time.time() + 600 # after flag is set, give 10 minute to 
+                                                                                # reset a password.
+    request.session.set_expiry(600) #session expiry timer for 10 min
 
 
     return Response(
@@ -309,6 +332,81 @@ class ProductViewSet(viewsets.ModelViewSet):
         instance.is_deleted = True
         instance.save(update_fields=['is_deleted']) #so it just update this instead of writing all fields
 
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def product_action(self, request, pk=None):
+        if request.user.account.role != 'customer':
+            return Response(
+                {'error': 'Only customers can buy or add products to cart.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        product = self.get_object() #retrieves the specific object associated with the URL
+
+        quantity = request.data.get('quantity')
+        action_type = request.data.get('action')
+
+        # Validate quantity
+        if quantity is None or str(quantity).strip() == '':
+            return Response(
+                {'error': 'Quantity is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            quantity = int(quantity)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Quantity must be a valid number.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if quantity <= 0:
+            return Response(
+                {'error': 'Quantity must be greater than 0.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if action_type == 'cart':
+
+            # Clear any previous Buy Now selection
+            request.session.pop('buy_now_product_id', None)
+            request.session.pop('buy_now_quantity', None)
+
+            cart, _ = Cart.objects.get_or_create(customer=request.user)
+
+            cart_item, item_created = CartItem.objects.get_or_create(
+                cart=cart,
+                product=product,
+                defaults={'quantity': quantity}
+            )
+
+            if not item_created:
+                cart_item.quantity += quantity
+                cart_item.save(update_fields=['quantity'])
+
+            return Response(
+                {'message': 'Product added to cart successfully.'},
+                status=status.HTTP_200_OK
+            )
+
+        elif action_type == 'buy':
+            request.session['buy_now_product_id'] = product.id
+            request.session['buy_now_quantity'] = quantity
+
+            return Response(
+                {
+                    'message': 'Product selected for purchase.',
+                    'product_id': product.id,
+                    'quantity': quantity
+                },
+                status=status.HTTP_200_OK
+            )
+
+        return Response(
+            {'error': 'Invalid action. Choose "cart" or "buy".'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
 
 # This is another type of serializer for only list and retrieve
 class CartViewSet(viewsets.ReadOnlyModelViewSet):
@@ -367,6 +465,322 @@ class OrderViewSet(mixins.ListModelMixin,
         instance.save(update_fields=['is_deleted']) #so it just update this instead of writing all fields
 
 
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def api_checkout(request):
+
+    # Only customers can checkout
+    if request.user.account.role != 'customer':
+        return Response(
+            {'error': 'Only customers can checkout.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Check whether this is a Buy Now purchase
+    buy_now_product_id = request.session.get('buy_now_product_id')
+    buy_now_quantity = request.session.get('buy_now_quantity')
+
+    # If both values exist, process this as a Buy Now purchase.
+    if buy_now_product_id and buy_now_quantity:
+
+        product = Product.objects.filter(
+            id=buy_now_product_id,
+            is_deleted=False
+        ).first() # .first() returns the product if found, otherwise None.
+
+        if product is None:
+            return Response(
+                {'error': 'Product not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        items = [{
+            'product': product,
+            'quantity': buy_now_quantity,
+        }]
+
+        receipt = f'Product {product.id}'
+
+    else:
+        # Otherwise, checkout using the cart
+        cart = Cart.objects.filter(
+            customer=request.user
+        ).first()
+
+        if cart is None:
+            return Response(
+                {'error': 'Your cart is empty.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        cart_items = CartItem.objects.filter(
+            cart=cart,
+            product__is_deleted=False
+        ).select_related('product')  # select_related('product') fetches related product data efficiently.
+
+        if not cart_items.exists():
+            return Response(
+                {'error': 'Your cart is empty.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        items = [
+            {
+                'product': item.product,
+                'quantity': item.quantity,
+            }
+            for item in cart_items
+        ]
+
+        receipt = f'Cart {cart.id}'
+
+  
+
+    # Calculate the subtotal before applying any coupon.
+    # For every item, multiply its price by its quantity,
+    # then add all the item totals together.
+
+    total = sum(
+        item['product'].price * item['quantity']
+        for item in items
+    )
+
+    # Calculate coupon discount
+    coupon_code = request.data.get('coupon_code')    
+    coupon = None
+    discount = Decimal('0')
+
+    if coupon_code:
+        coupon = Coupon.objects.filter(
+            code=coupon_code,
+            valid=True
+        ).first()
 
 
+    # If a valid coupon was found, calculate the discount.
+    if coupon:
+        discount = (
+            total * coupon.discount_percent / Decimal('100')
+        )
 
+    # Subtract the discount from the subtotal to get the final amount.
+    final_total = total - discount
+
+    if final_total <= 0:
+        return Response(
+            {'error': 'The final amount must be greater than zero.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Convert rupees to paise
+    amount_paise = int(final_total*100)
+
+    # Create Razorpay order --------------------------------------
+    try:
+        razorpay_order = client.order.create({
+            'amount': amount_paise,
+            'currency': 'INR',
+            'receipt': receipt,
+        })
+
+    except Exception:
+        logging.exception('Failed to create Razorpay order.')
+
+        return Response(
+            {'error': 'Unable to initiate payment. Please try again.'},
+            status=status.HTTP_502_BAD_GATEWAY
+        )
+    # Save the pending order and its items together.
+    with transaction.atomic():
+
+        # Create the main order.
+        order = Order.objects.create(
+            customer=request.user,
+            coupon=coupon,
+            total=total,
+            discount=discount,
+            final_total=final_total,
+            razorpay_order_id=razorpay_order['id'],
+            payment_status='pending',
+        )
+
+        # Save the products selected during checkout.
+        OrderItem.objects.bulk_create([
+            OrderItem(
+                order=order,
+                product=item['product'],
+                quantity=item['quantity'],
+                price=item['product'].price,
+            )
+            for item in items
+        ])
+
+    # Return checkout information to the frontend
+    return Response(
+        {
+            'message': 'Checkout initiated successfully.',
+            'razorpay_order_id': razorpay_order['id'],
+            'razorpay_key_id': settings.RAZORPAY_KEY_ID,
+            'amount': amount_paise,
+            'currency': 'INR',
+            'subtotal': str(total),
+            'discount': str(discount),
+            'final_total': str(final_total),
+            'items': [
+                {
+                    'product_id': item['product'].id,
+                    'product_name': item['product'].name,
+                    'quantity': item['quantity'],
+                    'unit_price': str(item['product'].price),
+                }
+                for item in items
+            ],
+            'django_order_id': order.id,
+            'razorpay_order_id': order.razorpay_order_id,
+        },
+        status=status.HTTP_201_CREATED
+    )
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def payment_success(request):
+
+    # Only customers can verify their purchases.
+    if request.user.account.role != 'customer':
+        return Response(
+            {'error': 'Only customers can complete purchases.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Get payment details returned by Razorpay.
+    razorpay_order_id = request.data.get('razorpay_order_id')
+    razorpay_payment_id = request.data.get('razorpay_payment_id')
+    razorpay_signature = request.data.get('razorpay_signature')
+
+    # Make sure all required details are provided.
+    if not all([
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature
+    ]):
+        return Response(
+            {'error': 'All Razorpay payment details are required.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Find the order belonging to this customer.
+    order = Order.objects.filter(
+        customer=request.user,
+        razorpay_order_id=razorpay_order_id
+    ).first()
+
+    if order is None:
+        return Response(
+            {'error': 'Order not found.'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Do not process an order that has already been paid.
+    if order.payment_status == 'paid':
+        return Response(
+            {'message': 'This order has already been paid.'},
+            status=status.HTTP_200_OK
+        )
+
+    # Verify that the signature was generated using Razorpay's secret.
+    try:
+        client.utility.verify_payment_signature({
+            'razorpay_order_id': razorpay_order_id,
+            'razorpay_payment_id': razorpay_payment_id,
+            'razorpay_signature': razorpay_signature,
+        })
+    except razorpay.errors.SignatureVerificationError:
+        return Response(
+            {'error': 'Payment signature verification failed.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Retrieve the payment details directly from Razorpay.
+    try:
+        payment = client.payment.fetch(razorpay_payment_id)
+    except Exception:
+        logging.exception('Failed to fetch Razorpay payment.')
+
+        return Response(
+            {'error': 'Unable to verify payment status.'},
+            status=status.HTTP_502_BAD_GATEWAY
+        )
+
+    # Confirm that this payment belongs to the expected Razorpay order.
+    if payment.get('order_id') != order.razorpay_order_id:
+        return Response(
+            {'error': 'Payment does not match this order.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Confirm that the payment amount matches the expected total.
+    expected_amount = int(order.final_total * 100)
+
+    if payment.get('amount') != expected_amount:
+        return Response(
+            {'error': 'Payment amount does not match the order.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # A valid signature does not necessarily mean the payment is captured.
+    if payment.get('status') != 'captured':
+        return Response(
+            {
+                'message': 'Payment has not been captured yet.',
+                'payment_status': payment.get('status'),
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Mark the existing order as paid.
+    with transaction.atomic():
+        order = Order.objects.select_for_update().get(
+            pk=order.pk,
+            customer=request.user
+        )
+
+        # Recheck the status in case another request processed it.
+        if order.payment_status == 'paid':
+            return Response(
+                {'message': 'This order has already been paid.'},
+                status=status.HTTP_200_OK
+            )
+
+        order.payment_id = razorpay_payment_id
+        order.payment_status = 'paid'
+        order.save(update_fields=['payment_id', 'payment_status'])
+
+        # If this was a cart checkout, remove only the purchased items.
+        # Do not clear the cart for Buy Now purchases.
+        buy_now_product_id = request.session.get('buy_now_product_id')
+
+        if not buy_now_product_id:
+            CartItem.objects.filter(
+                cart__customer=request.user,
+                product__in=order.items.values('product_id')
+            ).delete()
+
+        # Clear Buy Now session data only if it belongs to this purchase.
+        if buy_now_product_id:
+            request.session.pop('buy_now_product_id', None)
+            request.session.pop('buy_now_quantity', None)
+
+        # Clear coupon data after successful payment.
+        request.session.pop('coupon_code', None)
+        request.session.pop('discount', None)
+
+    return Response(
+        {
+            'message': 'Payment verified successfully. Order placed.',
+            'order_id': order.id,
+            'payment_id': order.payment_id,
+            'payment_status': order.payment_status,
+        },
+        status=status.HTTP_200_OK
+    )

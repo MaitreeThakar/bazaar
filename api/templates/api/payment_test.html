@@ -1,0 +1,33 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bazaar API Payment Test</title>
+</head>
+
+<body>
+    <h1>Bazaar — API Payment Test</h1>
+
+    <p>Enter a coupon code if you want to test a discount.</p>
+
+    <form id="csrf-form">
+        {% csrf_token %}
+    </form>
+
+    <label for="coupon-code">Coupon code:</label>
+    <input type="text" id="coupon-code" placeholder="Optional">
+
+    <button type="button" id="pay-button">
+        Pay Now
+    </button>
+
+    <p id="payment-status" role="status"></p>
+
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script src="{% static 'api/payment_test.js' %}"></script>
+</body>
+
+</html>

@@ -20,6 +20,13 @@ urlpatterns=[
     path('verify_otp/',views.verify_otp),
     path('resend_otp/',views.resend_otp),
     path('reset_password/',views.reset_password),
+    path('checkout/',views.api_checkout),
+    path('payment-success/',views.payment_success),
+    path(
+    'payment-test/',
+    views.payment_test_page,
+    name='payment-test'
+),
 
     path("",include(router.urls)),
 
